@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>黒塗りアプリ - Evian Blackout</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🖤 黒塗りアプリ</h1>
+            <p>テキストを選択して黒塗りにできます</p>
+        </header>
+
+        <main>
+            <div class="input-section">
+                <h2>1. テキストを入力</h2>
+                <textarea id="inputText" placeholder="ここにテキストを入力してください...&#10;例：&#10;機密情報：パスワードは12345です。&#10;個人情報：山田太郎の電話番号は090-1234-5678です。"></textarea>
+                <button id="loadText" class="btn btn-primary">テキストを読み込む</button>
+            </div>
+
+            <div class="output-section">
+                <h2>2. 黒塗りにする部分を選択</h2>
+                <p class="instruction">黒塗りにしたい文字をマウスで選択してから「黒塗りにする」ボタンを押してください</p>
+                <div id="textDisplay" class="text-display"></div>
+                <div class="button-group">
+                    <button id="applyBlackout" class="btn btn-blackout" disabled>選択部分を黒塗りにする</button>
+                    <button id="resetText" class="btn btn-secondary" disabled>リセット</button>
+                    <button id="downloadImage" class="btn btn-success" disabled>画像としてダウンロード</button>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>© 2025 Evian Blackout App</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

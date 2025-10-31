@@ -1,246 +1,300 @@
 // グローバル変数
-let originalText = '';
-let blackoutRanges = [];
+let canvas, ctx;
+let image = null;
+let blackoutRects = [];
+let isDrawing = false;
+let startX, startY;
+let currentRect = null;
 
-// DOM要素の取得
-const inputText = document.getElementById('inputText');
-const loadTextBtn = document.getElementById('loadText');
-const textDisplay = document.getElementById('textDisplay');
-const applyBlackoutBtn = document.getElementById('applyBlackout');
-const resetBtn = document.getElementById('resetText');
-const downloadBtn = document.getElementById('downloadImage');
+// DOM要素
+const uploadArea = document.getElementById('uploadArea');
+const imageInput = document.getElementById('imageInput');
+const editorSection = document.getElementById('editorSection');
+const imageCanvas = document.getElementById('imageCanvas');
+const undoBtn = document.getElementById('undoBtn');
+const resetBtn = document.getElementById('resetBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const newImageBtn = document.getElementById('newImageBtn');
 
-// イベントリスナーの設定
-loadTextBtn.addEventListener('click', loadText);
-applyBlackoutBtn.addEventListener('click', applyBlackout);
-resetBtn.addEventListener('click', resetText);
-downloadBtn.addEventListener('click', downloadAsImage);
+// 初期化
+function init() {
+    canvas = imageCanvas;
+    ctx = canvas.getContext('2d');
 
-// テキスト選択時にボタンを有効化
-textDisplay.addEventListener('mouseup', handleSelection);
-textDisplay.addEventListener('touchend', handleSelection);
+    // イベントリスナー設定
+    uploadArea.addEventListener('click', () => imageInput.click());
+    imageInput.addEventListener('change', handleImageUpload);
 
-// テキストを読み込む
-function loadText() {
-    const text = inputText.value.trim();
-    if (!text) {
-        alert('テキストを入力してください');
-        return;
-    }
+    // ドラッグ&ドロップ
+    uploadArea.addEventListener('dragover', handleDragOver);
+    uploadArea.addEventListener('dragleave', handleDragLeave);
+    uploadArea.addEventListener('drop', handleDrop);
 
-    originalText = text;
-    blackoutRanges = [];
-    renderText();
+    // キャンバスイベント
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseout', stopDrawing);
 
-    applyBlackoutBtn.disabled = true;
-    resetBtn.disabled = false;
-    downloadBtn.disabled = false;
+    // タッチイベント
+    canvas.addEventListener('touchstart', handleTouchStart);
+    canvas.addEventListener('touchmove', handleTouchMove);
+    canvas.addEventListener('touchend', handleTouchEnd);
+
+    // ボタンイベント
+    undoBtn.addEventListener('click', undoLastBlackout);
+    resetBtn.addEventListener('click', resetBlackouts);
+    downloadBtn.addEventListener('click', downloadImage);
+    newImageBtn.addEventListener('click', loadNewImage);
 }
 
-// テキストを表示
-function renderText() {
-    if (!originalText) {
-        textDisplay.innerHTML = '';
-        return;
-    }
-
-    // 黒塗り範囲をソート
-    blackoutRanges.sort((a, b) => a.start - b.start);
-
-    let html = '';
-    let lastIndex = 0;
-
-    blackoutRanges.forEach(range => {
-        // 通常のテキスト
-        html += escapeHtml(originalText.substring(lastIndex, range.start));
-        // 黒塗り部分
-        html += `<span class="blackout">${escapeHtml(originalText.substring(range.start, range.end))}</span>`;
-        lastIndex = range.end;
-    });
-
-    // 残りのテキスト
-    html += escapeHtml(originalText.substring(lastIndex));
-
-    textDisplay.innerHTML = html;
+// ドラッグオーバー
+function handleDragOver(e) {
+    e.preventDefault();
+    uploadArea.classList.add('drag-over');
 }
 
-// テキスト選択の処理
-function handleSelection() {
-    const selection = window.getSelection();
-    const selectedText = selection.toString();
-
-    if (selectedText && textDisplay.contains(selection.anchorNode)) {
-        applyBlackoutBtn.disabled = false;
-    } else {
-        applyBlackoutBtn.disabled = true;
-    }
+// ドラッグリーブ
+function handleDragLeave(e) {
+    e.preventDefault();
+    uploadArea.classList.remove('drag-over');
 }
 
-// 黒塗りを適用
-function applyBlackout() {
-    const selection = window.getSelection();
-    if (!selection.rangeCount) return;
+// ドロップ
+function handleDrop(e) {
+    e.preventDefault();
+    uploadArea.classList.remove('drag-over');
 
-    const range = selection.getRangeAt(0);
-
-    // 選択範囲がtextDisplay内かチェック
-    if (!textDisplay.contains(range.commonAncestorContainer)) {
-        alert('テキスト表示エリア内の文字を選択してください');
-        return;
-    }
-
-    // 選択されたテキストの位置を計算
-    const preCaretRange = range.cloneRange();
-    preCaretRange.selectNodeContents(textDisplay);
-    preCaretRange.setEnd(range.startContainer, range.startOffset);
-
-    const start = getTextLength(preCaretRange);
-    const end = start + selection.toString().length;
-
-    // 範囲を追加（重複チェック）
-    const overlapping = blackoutRanges.some(r =>
-        (start >= r.start && start < r.end) ||
-        (end > r.start && end <= r.end) ||
-        (start <= r.start && end >= r.end)
-    );
-
-    if (!overlapping) {
-        blackoutRanges.push({ start, end });
-        renderText();
-    }
-
-    // 選択を解除
-    selection.removeAllRanges();
-    applyBlackoutBtn.disabled = true;
-}
-
-// テキストの長さを計算（黒塗りタグを無視）
-function getTextLength(range) {
-    const tempDiv = document.createElement('div');
-    tempDiv.appendChild(range.cloneContents());
-
-    // 黒塗りクラスのspanを通常テキストに変換
-    const blackouts = tempDiv.querySelectorAll('.blackout');
-    blackouts.forEach(span => {
-        span.replaceWith(span.textContent);
-    });
-
-    return tempDiv.textContent.length;
-}
-
-// HTMLエスケープ
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// リセット
-function resetText() {
-    blackoutRanges = [];
-    renderText();
-    applyBlackoutBtn.disabled = true;
-}
-
-// 画像としてダウンロード
-async function downloadAsImage() {
-    try {
-        // html2canvasの代わりにCanvas APIを使用
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-
-        // キャンバスのサイズを設定
-        const padding = 40;
-        const lineHeight = 30;
-        const fontSize = 18;
-        const maxWidth = 800;
-
-        ctx.font = `${fontSize}px Arial, sans-serif`;
-
-        // テキストを行に分割
-        const lines = wrapText(ctx, originalText, maxWidth - padding * 2);
-
-        canvas.width = maxWidth;
-        canvas.height = lines.length * lineHeight + padding * 2;
-
-        // 背景を白に
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // テキストを描画
-        ctx.fillStyle = 'black';
-        ctx.font = `${fontSize}px Arial, sans-serif`;
-
-        let charIndex = 0;
-        lines.forEach((line, lineIndex) => {
-            const y = padding + (lineIndex + 1) * lineHeight;
-            let x = padding;
-
-            for (let char of line) {
-                const isBlackout = blackoutRanges.some(range =>
-                    charIndex >= range.start && charIndex < range.end
-                );
-
-                if (isBlackout) {
-                    ctx.fillStyle = 'black';
-                    const charWidth = ctx.measureText(char).width;
-                    ctx.fillRect(x, y - fontSize, charWidth, fontSize + 4);
-                } else {
-                    ctx.fillStyle = 'black';
-                    ctx.fillText(char, x, y);
-                }
-
-                x += ctx.measureText(char).width;
-                charIndex++;
-            }
-
-            // 改行文字もカウント
-            if (lineIndex < lines.length - 1) {
-                charIndex++;
-            }
-        });
-
-        // ダウンロード
-        canvas.toBlob(blob => {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'blackout-text.png';
-            a.click();
-            URL.revokeObjectURL(url);
-        });
-
-    } catch (error) {
-        console.error('ダウンロードエラー:', error);
-        alert('画像のダウンロードに失敗しました');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        const file = files[0];
+        if (file.type.startsWith('image/')) {
+            loadImageFromFile(file);
+        } else {
+            alert('画像ファイルを選択してください');
+        }
     }
 }
 
-// テキストを行に分割
-function wrapText(ctx, text, maxWidth) {
-    const lines = [];
-    const paragraphs = text.split('\n');
-
-    paragraphs.forEach(paragraph => {
-        if (!paragraph) {
-            lines.push('');
+// 画像アップロード処理
+function handleImageUpload(e) {
+    const file = e.target.files[0];
+    if (file) {
+        if (file.size > 10 * 1024 * 1024) {
+            alert('ファイルサイズは10MB以下にしてください');
             return;
         }
+        loadImageFromFile(file);
+    }
+}
 
-        let line = '';
-        for (let char of paragraph) {
-            const testLine = line + char;
-            const metrics = ctx.measureText(testLine);
+// ファイルから画像を読み込む
+function loadImageFromFile(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        image = new Image();
+        image.onload = function() {
+            setupCanvas();
+            document.querySelector('.input-section').style.display = 'none';
+            editorSection.style.display = 'block';
+        };
+        image.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
 
-            if (metrics.width > maxWidth && line) {
-                lines.push(line);
-                line = char;
-            } else {
-                line = testLine;
-            }
-        }
-        lines.push(line);
+// キャンバスのセットアップ
+function setupCanvas() {
+    blackoutRects = [];
+
+    // キャンバスサイズを画像に合わせる
+    const maxWidth = 900;
+    const maxHeight = 700;
+
+    let width = image.width;
+    let height = image.height;
+
+    // 最大サイズに収まるようにリサイズ
+    if (width > maxWidth) {
+        height = (maxWidth / width) * height;
+        width = maxWidth;
+    }
+    if (height > maxHeight) {
+        width = (maxHeight / height) * width;
+        height = maxHeight;
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+
+    redrawCanvas();
+}
+
+// キャンバスを再描画
+function redrawCanvas() {
+    // 画像を描画
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    // 黒塗りを描画
+    ctx.fillStyle = '#000000';
+    blackoutRects.forEach(rect => {
+        ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
     });
 
-    return lines;
+    // 現在描画中の矩形
+    if (currentRect) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(currentRect.x, currentRect.y, currentRect.width, currentRect.height);
+    }
 }
+
+// 描画開始
+function startDrawing(e) {
+    isDrawing = true;
+    const rect = canvas.getBoundingClientRect();
+    startX = e.clientX - rect.left;
+    startY = e.clientY - rect.top;
+}
+
+// 描画中
+function draw(e) {
+    if (!isDrawing) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.top;
+
+    const width = currentX - startX;
+    const height = currentY - startY;
+
+    currentRect = {
+        x: width < 0 ? currentX : startX,
+        y: height < 0 ? currentY : startY,
+        width: Math.abs(width),
+        height: Math.abs(height)
+    };
+
+    redrawCanvas();
+}
+
+// 描画終了
+function stopDrawing(e) {
+    if (!isDrawing) return;
+    isDrawing = false;
+
+    if (currentRect && currentRect.width > 5 && currentRect.height > 5) {
+        blackoutRects.push(currentRect);
+    }
+
+    currentRect = null;
+    redrawCanvas();
+}
+
+// タッチ開始
+function handleTouchStart(e) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+
+    isDrawing = true;
+    startX = touch.clientX - rect.left;
+    startY = touch.clientY - rect.top;
+}
+
+// タッチ移動
+function handleTouchMove(e) {
+    e.preventDefault();
+    if (!isDrawing) return;
+
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const currentX = touch.clientX - rect.left;
+    const currentY = touch.clientY - rect.top;
+
+    const width = currentX - startX;
+    const height = currentY - startY;
+
+    currentRect = {
+        x: width < 0 ? currentX : startX,
+        y: height < 0 ? currentY : startY,
+        width: Math.abs(width),
+        height: Math.abs(height)
+    };
+
+    redrawCanvas();
+}
+
+// タッチ終了
+function handleTouchEnd(e) {
+    e.preventDefault();
+    if (!isDrawing) return;
+    isDrawing = false;
+
+    if (currentRect && currentRect.width > 5 && currentRect.height > 5) {
+        blackoutRects.push(currentRect);
+    }
+
+    currentRect = null;
+    redrawCanvas();
+}
+
+// 最後の黒塗りを取り消す
+function undoLastBlackout() {
+    if (blackoutRects.length > 0) {
+        blackoutRects.pop();
+        redrawCanvas();
+    }
+}
+
+// すべてリセット
+function resetBlackouts() {
+    if (confirm('すべての黒塗りをリセットしますか？')) {
+        blackoutRects = [];
+        redrawCanvas();
+    }
+}
+
+// 画像をダウンロード
+function downloadImage() {
+    // 最終的な画像を作成
+    const downloadCanvas = document.createElement('canvas');
+    downloadCanvas.width = canvas.width;
+    downloadCanvas.height = canvas.height;
+    const downloadCtx = downloadCanvas.getContext('2d');
+
+    // 画像と黒塗りを描画
+    downloadCtx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    downloadCtx.fillStyle = '#000000';
+    blackoutRects.forEach(rect => {
+        downloadCtx.fillRect(rect.x, rect.y, rect.width, rect.height);
+    });
+
+    // ダウンロード
+    downloadCanvas.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'evian-blackout-' + Date.now() + '.png';
+        a.click();
+        URL.revokeObjectURL(url);
+    }, 'image/png');
+}
+
+// 新しい画像を読み込む
+function loadNewImage() {
+    if (blackoutRects.length > 0) {
+        if (!confirm('現在の編集内容は失われます。続けますか？')) {
+            return;
+        }
+    }
+
+    document.querySelector('.input-section').style.display = 'block';
+    editorSection.style.display = 'none';
+    imageInput.value = '';
+    image = null;
+    blackoutRects = [];
+}
+
+// 初期化実行
+init();

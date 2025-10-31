@@ -9,25 +9,40 @@
 <body>
     <div class="container">
         <header>
-            <h1>🖤 黒塗りアプリ</h1>
-            <p>テキストを選択して黒塗りにできます</p>
+            <h1>🖤 Evian Blackout</h1>
+            <p>画像内のテキストを黒塗りにできます</p>
         </header>
 
         <main>
             <div class="input-section">
-                <h2>1. テキストを入力</h2>
-                <textarea id="inputText" placeholder="ここにテキストを入力してください...&#10;例：&#10;機密情報：パスワードは12345です。&#10;個人情報：山田太郎の電話番号は090-1234-5678です。"></textarea>
-                <button id="loadText" class="btn btn-primary">テキストを読み込む</button>
+                <h2>1. 画像をアップロード</h2>
+                <div class="upload-area" id="uploadArea">
+                    <input type="file" id="imageInput" accept="image/*" hidden>
+                    <div class="upload-content">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <p>クリックまたはドラッグ&ドロップで画像をアップロード</p>
+                        <p class="upload-hint">PNG, JPG, GIF (最大10MB)</p>
+                    </div>
+                </div>
             </div>
 
-            <div class="output-section">
-                <h2>2. 黒塗りにする部分を選択</h2>
-                <p class="instruction">黒塗りにしたい文字をマウスで選択してから「黒塗りにする」ボタンを押してください</p>
-                <div id="textDisplay" class="text-display"></div>
+            <div class="editor-section" id="editorSection" style="display: none;">
+                <h2>2. 黒塗りエリアをドラッグで選択</h2>
+                <p class="instruction">マウスをドラッグして黒塗りにしたいエリアを選択してください</p>
+
+                <div class="canvas-container">
+                    <canvas id="imageCanvas"></canvas>
+                </div>
+
                 <div class="button-group">
-                    <button id="applyBlackout" class="btn btn-blackout" disabled>選択部分を黒塗りにする</button>
-                    <button id="resetText" class="btn btn-secondary" disabled>リセット</button>
-                    <button id="downloadImage" class="btn btn-success" disabled>画像としてダウンロード</button>
+                    <button id="undoBtn" class="btn btn-secondary">最後の黒塗りを取り消す</button>
+                    <button id="resetBtn" class="btn btn-secondary">すべてリセット</button>
+                    <button id="downloadBtn" class="btn btn-success">画像をダウンロード</button>
+                    <button id="newImageBtn" class="btn btn-primary">別の画像を選択</button>
                 </div>
             </div>
         </main>

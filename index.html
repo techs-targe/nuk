@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>黒塗りアプリ - Evian Blackout</title>
     <link rel="stylesheet" href="style.css">
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
 </head>
 <body>
     <div class="container">
@@ -28,6 +29,15 @@
                         <p class="upload-hint">PNG, JPG, GIF (最大10MB)</p>
                     </div>
                 </div>
+                <div class="button-group" style="margin-top: 20px;">
+                    <button id="cameraBtn" class="btn btn-camera">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                        カメラで撮影
+                    </button>
+                </div>
             </div>
 
             <div class="editor-section" id="editorSection" style="display: none;">
@@ -50,6 +60,42 @@
         <footer>
             <p>© 2025 Evian Blackout App</p>
         </footer>
+    </div>
+
+    <!-- Camera Modal -->
+    <div id="cameraModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📷 カメラで撮影</h2>
+                <button id="closeCameraBtn" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <video id="cameraVideo" autoplay playsinline></video>
+                <canvas id="cameraCanvas" style="display: none;"></canvas>
+            </div>
+            <div class="modal-footer">
+                <button id="captureBtn" class="btn btn-success">撮影する</button>
+                <button id="cancelCameraBtn" class="btn btn-secondary">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Evian Detection Popup -->
+    <div id="evianPopup" class="popup">
+        <div class="popup-content">
+            <div class="popup-icon">💧</div>
+            <h2>Evian検出！</h2>
+            <p>画像にevianが含まれています</p>
+            <button id="closePopupBtn" class="btn btn-primary">OK</button>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>画像を解析中...</p>
+        </div>
     </div>
 
     <script src="script.js"></script>

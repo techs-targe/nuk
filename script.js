@@ -5,6 +5,7 @@ let blackoutRects = [];
 let isDrawing = false;
 let startX, startY;
 let currentRect = null;
+let cameraStream = null;
 
 // DOM要素
 const uploadArea = document.getElementById('uploadArea');
@@ -15,6 +16,20 @@ const undoBtn = document.getElementById('undoBtn');
 const resetBtn = document.getElementById('resetBtn');
 const downloadBtn = document.getElementById('downloadBtn');
 const newImageBtn = document.getElementById('newImageBtn');
+
+// Camera elements
+const cameraBtn = document.getElementById('cameraBtn');
+const cameraModal = document.getElementById('cameraModal');
+const cameraVideo = document.getElementById('cameraVideo');
+const cameraCanvas = document.getElementById('cameraCanvas');
+const captureBtn = document.getElementById('captureBtn');
+const closeCameraBtn = document.getElementById('closeCameraBtn');
+const cancelCameraBtn = document.getElementById('cancelCameraBtn');
+
+// Popup elements
+const evianPopup = document.getElementById('evianPopup');
+const closePopupBtn = document.getElementById('closePopupBtn');
+const loadingOverlay = document.getElementById('loadingOverlay');
 
 // 初期化
 function init() {
@@ -46,7 +61,98 @@ function init() {
     resetBtn.addEventListener('click', resetBlackouts);
     downloadBtn.addEventListener('click', downloadImage);
     newImageBtn.addEventListener('click', loadNewImage);
+
+    // Camera events
+    cameraBtn.addEventListener('click', openCamera);
+    closeCameraBtn.addEventListener('click', closeCamera);
+    cancelCameraBtn.addEventListener('click', closeCamera);
+    captureBtn.addEventListener('click', capturePhoto);
+
+    // Popup events
+    closePopupBtn.addEventListener('click', closeEvianPopup);
 }
+
+// ============ Camera Functions ============
+
+async function openCamera() {
+    try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' },
+            audio: false
+        });
+        cameraVideo.srcObject = cameraStream;
+        cameraModal.classList.add('show');
+    } catch (error) {
+        console.error('カメラエラー:', error);
+        alert('カメラにアクセスできませんでした。カメラの許可を確認してください。');
+    }
+}
+
+function closeCamera() {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+    }
+    cameraModal.classList.remove('show');
+}
+
+function capturePhoto() {
+    const context = cameraCanvas.getContext('2d');
+
+    // Set canvas size to video size
+    cameraCanvas.width = cameraVideo.videoWidth;
+    cameraCanvas.height = cameraVideo.videoHeight;
+
+    // Draw video frame to canvas
+    context.drawImage(cameraVideo, 0, 0);
+
+    // Convert canvas to blob
+    cameraCanvas.toBlob(blob => {
+        closeCamera();
+        loadImageFromBlob(blob);
+    }, 'image/jpeg', 0.95);
+}
+
+// ============ OCR Functions ============
+
+async function detectEvian(imageElement) {
+    showLoading(true);
+
+    try {
+        const { data: { text } } = await Tesseract.recognize(
+            imageElement,
+            'eng',
+            {
+                logger: info => console.log(info)
+            }
+        );
+
+        console.log('OCR結果:', text);
+
+        // Check if "evian" exists in the text (case-insensitive)
+        if (text.toLowerCase().includes('evian')) {
+            showEvianPopup();
+        }
+    } catch (error) {
+        console.error('OCRエラー:', error);
+    } finally {
+        showLoading(false);
+    }
+}
+
+function showEvianPopup() {
+    evianPopup.classList.add('show');
+}
+
+function closeEvianPopup() {
+    evianPopup.classList.remove('show');
+}
+
+function showLoading(show) {
+    loadingOverlay.style.display = show ? 'flex' : 'none';
+}
+
+// ============ Image Upload Functions ============
 
 // ドラッグオーバー
 function handleDragOver(e) {
@@ -92,16 +198,35 @@ function handleImageUpload(e) {
 function loadImageFromFile(file) {
     const reader = new FileReader();
     reader.onload = function(e) {
-        image = new Image();
-        image.onload = function() {
-            setupCanvas();
-            document.querySelector('.input-section').style.display = 'none';
-            editorSection.style.display = 'block';
-        };
-        image.src = e.target.result;
+        loadImageFromDataURL(e.target.result);
     };
     reader.readAsDataURL(file);
 }
+
+// Blobから画像を読み込む
+function loadImageFromBlob(blob) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        loadImageFromDataURL(e.target.result);
+    };
+    reader.readAsDataURL(blob);
+}
+
+// Data URLから画像を読み込む
+function loadImageFromDataURL(dataURL) {
+    image = new Image();
+    image.onload = function() {
+        setupCanvas();
+        document.querySelector('.input-section').style.display = 'none';
+        editorSection.style.display = 'block';
+
+        // Run OCR to detect "evian"
+        detectEvian(image);
+    };
+    image.src = dataURL;
+}
+
+// ============ Canvas Functions ============
 
 // キャンバスのセットアップ
 function setupCanvas() {
@@ -149,6 +274,8 @@ function redrawCanvas() {
     }
 }
 
+// ============ Drawing Functions ============
+
 // 描画開始
 function startDrawing(e) {
     isDrawing = true;
@@ -190,6 +317,8 @@ function stopDrawing(e) {
     currentRect = null;
     redrawCanvas();
 }
+
+// ============ Touch Functions ============
 
 // タッチ開始
 function handleTouchStart(e) {
@@ -238,6 +367,8 @@ function handleTouchEnd(e) {
     currentRect = null;
     redrawCanvas();
 }
+
+// ============ Edit Functions ============
 
 // 最後の黒塗りを取り消す
 function undoLastBlackout() {
